@@ -1,0 +1,40 @@
+const { MessageFlags } = require('discord.js');
+const database = require('../../utils/database');
+const buildEmbed = require('../../utils/buildEmbed');
+const replyEmbed = require('../../utils/replyEmbed');
+const embedModal = require('../../Modals/embed')
+
+module.exports = async (interaction) => {
+    //await replyEmbed.update(interaction, `Processing interaction`, replyEmbed.status.success, true)
+
+    const parms = interaction.customId.split('_')
+    const modal = parms[0]
+    const action = parms[1]
+
+    const embedId = interaction.values[0]
+    if (!embedId) return;
+
+    const embedData = await database(`GET/main/embeds/${embedId}`)
+    if (!embedData) return
+
+    const {title, description, color, thumbnail, image} = embedData
+
+
+    switch (action) { // Deafer???
+        case 'show':
+            const embed = buildEmbed(title, description, color, thumbnail, image)
+            if (!embed) return
+
+            interaction.channel.send({ embeds: [embed] })
+            await replyEmbed.update(interaction, `Sent \`\`${embedId}\`\` embed to \`\`${interaction.channel.name}\`\` channel`, replyEmbed.status.success, true)
+            break;
+        case 'edit':
+            const modal = embedModal(embedId, title, description, thumbnail, image, color)
+
+            // Show the modal to the user
+            await interaction.showModal(modal);
+            break;
+        default:
+            break;
+    }
+};

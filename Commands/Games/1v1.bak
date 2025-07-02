@@ -1,0 +1,227 @@
+const Discord = require('discord.js');
+const Bot = require('../../bot.js');
+const Plugins = require('../../plugins');
+
+
+// Limit 1v1 requests, notify player when ranking up.
+const getRankInfo = (RP) => {
+    if (RP < 0) return ['Rookie III', 0, 0];
+
+    let lastRP = null;
+    let lastRank = null;
+    let gain = 10;
+
+    for (const [rank, value] of Object.entries(Plugins.resource.ranks)) {
+
+        if (lastRP <= value && RP >= value) {
+            lastRank = rank;
+            lastRP = value;
+        } else if (value <= RP) {
+            gain += 10;
+        }
+    };
+
+    return [lastRank.split('_').join(' '), lastRP, gain]
+}
+
+module.exports = {
+	name: '1v1',
+	description: '1v1 an opponent to rank up.',
+	usage: '<user>',
+	perms: [],
+    roles: [],
+    channels: ['1086759945149616149'],
+	cooldown: 15,
+	options: [
+		{
+			type: 6,
+			name: 'opponent',
+			description: 'Specify an opponent',
+			required: true
+		},
+	],
+
+	async execute(interaction) {
+        try {
+            const opponent = interaction.options.getUser('opponent');
+
+            const challengerData = await Plugins.db(`GET/ranked/${interaction.user.id}`);
+            const opponentData = await Plugins.db(`GET/ranked/${opponent.id}`);
+
+            const challengerRankInfo = getRankInfo(challengerData?.RP || 0);
+            const opponentRankInfo = getRankInfo(opponentData?.RP || 0);
+
+            const gainMultiplier = 2;
+
+            // Checks
+            if (!opponent || opponent.id === interaction.user.id) return Plugins.reply('I don\'t think that\'s how you fight your demons...', 'DANGER', interaction, {ephemeral: true});
+
+            // Request Embed
+            let duelRequestEmbed = new Discord.EmbedBuilder()
+                .setTitle(`Apex Legends 1v1 Request`)
+                .setDescription(`**Game:** Apex Legends\n**Weapons:** R99, Wingman, Peacekeeper\n**Attachments:** Purple Attachments | No Hop-Up\n**Rounds:** First To 5\nㅤ`)
+                .addFields([
+                    {
+                        name: interaction.user.tag, 
+                        value: `\`\`Rank: ${challengerRankInfo[0]}\`\`\n\`\`RP: ${challengerData?.RP || 0}\`\`\n\`\`Gain: +${opponentRankInfo[2]*gainMultiplier}\`\`\n\`\`Loss: -${challengerRankInfo[2]}\`\``
+                    },
+                    {
+                        name: opponent.tag,
+                        value: `\`\`Rank: ${opponentRankInfo[0]}\`\`\n\`\`RP: ${opponentData?.RP || 0}\`\`\n\`\`Gain: +${challengerRankInfo[2]*gainMultiplier}\`\`\n\`\`Loss: -${opponentRankInfo[2]}\`\``,
+                    }
+                ])
+                .setThumbnail('https://firebasestorage.googleapis.com/v0/b/teamglexar.appspot.com/o/ApexLegendsLogo.png?alt=media&token=e4bbd610-88af-4bd0-bae0-62d9096b4571')
+                .setFooter({text: 'Players may alter weapons and/or attachmetns only if agreen upon.\nThis request will expire in 15 minutes.'})
+                .setColor('#ff2020')
+
+            // Request Components
+            let duelRequestComponents = new Discord.ActionRowBuilder()
+                .addComponents(
+                    new Discord.ButtonBuilder()
+                        .setStyle(Discord.ButtonStyle.Danger)
+                        .setLabel('Accept Request')
+                        .setCustomId('duel_accept'),
+                    new Discord.ButtonBuilder()
+                        .setStyle(Discord.ButtonStyle.Danger)
+                        .setLabel('Cancel')
+                        .setCustomId('duel_cancel'),
+                    new Discord.ButtonBuilder()
+                        .setStyle(Discord.ButtonStyle.Secondary)
+                        .setLabel('WAITING')
+                        .setCustomId('duel_status')
+                        .setDisabled(),
+                )
+        
+            // Send MessageEmbed
+            let duelRequestMessage = await interaction.reply({ content: `||<@!${opponent.id}>||`, embeds: [duelRequestEmbed], components: [duelRequestComponents], fetchReply: true});
+
+            Plugins.db(`SET/ranked/matchData/${duelRequestMessage.id}`, {
+                challenger: {
+                    tag: interaction.user.username,
+                    id: interaction.user.id,
+                    gain: opponentRankInfo[2]*gainMultiplier,
+                    loss: challengerRankInfo[2]
+                },
+
+                opponent: {
+                    tag: opponent.username,
+                    id: opponent.id,
+                    gain: challengerRankInfo[2]*gainMultiplier,
+                    loss: opponentRankInfo[2]
+                },
+                status: 'WAITING'
+            })
+
+            await Plugins.wait(60*15);
+
+            let matchData = await Plugins.db(`GET/ranked/matchData/${duelRequestMessage.id}`);
+            if (matchData?.status !== 'WAITING') return;
+
+            Plugins.db(`DELETE/ranked/matchData/${duelRequestMessage.id}`)
+
+            let editComponents = new Discord.ActionRowBuilder()
+            .addComponents(
+                new Discord.ButtonBuilder()
+                    .setStyle(Discord.ButtonStyle.Secondary)
+                    .setLabel('EXPIRED')
+                    .setCustomId('duel_status')
+                    .setDisabled(),
+            )
+
+            duelRequestMessage.edit({ components: [editComponents] });
+        } catch (error) {console.error(Error(error))}
+	},
+};
+
+Bot.on('interactionCreate', async (interaction) => {
+    
+    if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith('duel')) return;
+
+    const type = interaction.customId.toUpperCase().split('_');
+    let matchData = await Plugins.db(`GET/ranked/matchData/${interaction.message.id}`);
+    if (!matchData) return;
+
+
+    if (type[1] === 'ACCEPT') {
+        if (matchData.opponent.id !== interaction.user.id) return Plugins.reply('You can only accept requests sent to you', 'WARN', interaction, {ephemeral: true});
+
+        matchData.status = 'DUELING';
+        Plugins.db(`SET/ranked/matchData/${interaction.message.id}`, matchData);
+
+        const challenger = interaction.guild.members.cache.get(matchData.challenger.id);
+        if (!challenger) return;
+
+        // Request Components
+        let editComponents = new Discord.ActionRowBuilder()
+        .addComponents(
+            new Discord.ButtonBuilder()
+                .setStyle(Discord.ButtonStyle.Danger)
+                .setLabel(`I Lost`)
+                .setCustomId(`duel_lost`),
+            new Discord.ButtonBuilder()
+                .setStyle(Discord.ButtonStyle.Secondary)
+                .setLabel('DUELING')
+                .setCustomId('duel_status')
+                .setDisabled(),
+        )
+
+        interaction.message.edit({ components: [editComponents] });
+    }
+    if (type[1] === 'CANCEL') {
+        if (matchData.challenger.id !== interaction.user.id) return Plugins.reply('You can only cancel your own duel requests', 'WARN', interaction, {ephemeral: true});
+
+        Plugins.db(`DELETE/ranked/matchData/${interaction.message.id}`);
+
+        // Request Components
+        let editComponents = new Discord.ActionRowBuilder()
+            .addComponents(
+                new Discord.ButtonBuilder()
+                    .setStyle(Discord.ButtonStyle.Secondary)
+                    .setLabel('CANCELED')
+                    .setCustomId('duel_status')
+                    .setDisabled(),
+            )
+        interaction.message.edit({ components: [editComponents] });
+    }
+    if (type[1] === 'LOST') {
+        let winner = null;
+        let loser = null;
+
+        if (matchData.challenger.id === interaction.user.id) {
+            loser = matchData.challenger;
+            winner = matchData.opponent;
+        } else if (matchData.opponent.id === interaction.user.id) {
+            loser = matchData.opponent;
+            winner = matchData.challenger;
+        }
+
+        if (!winner || !loser) return Plugins.reply('You are not part of this duel', 'WARN', interaction, {ephemeral: true});
+
+        let editComponents = new Discord.ActionRowBuilder()
+        .addComponents(
+            new Discord.ButtonBuilder()
+                .setStyle(Discord.ButtonStyle.Success)
+                .setLabel(`${winner.tag} +${winner.gain} RP`)
+                .setCustomId('duel_user1')
+                .setDisabled(),
+            new Discord.ButtonBuilder()
+                .setStyle(Discord.ButtonStyle.Primary)
+                .setLabel(`${loser.tag} -${loser.loss} RP`)
+                .setCustomId('duel_user2')
+                .setDisabled(),
+            new Discord.ButtonBuilder()
+                .setStyle(Discord.ButtonStyle.Secondary)
+                .setLabel('/Rank')
+                .setCustomId('duel_status')
+                .setDisabled(),
+        )
+        interaction.message.edit({ components: [editComponents] });
+
+        Plugins.db(`INCREMENT/ranked/${winner.id}/RP`, winner.gain);
+        Plugins.db(`INCREMENT/ranked/${loser.id}/RP`, -loser.loss, { positiveOnly: true });
+
+        Plugins.db(`DELETE/ranked/matchData/${interaction.message.id}`);
+    }
+    interaction.deferUpdate();
+})

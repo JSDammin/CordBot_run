@@ -1,0 +1,171 @@
+const Discord = require('discord.js');
+const Plugins = require('../plugins')
+
+
+
+module.exports = async (bot) => {
+    bot.on('guildMemberAdd', async (member) => {
+        
+        const user = bot.users.cache.get(member.id); // Get user object for dm
+
+        // Give auto roles to members
+        setTimeout(async () => { // Try to save resources by waiting on other bots to give roles
+            if (member.roles.cache.size > 1) return;
+
+            const getAutoRoles = Plugins.resource.glexar.autoRoles;
+			if (!getAutoRoles) return;
+
+			getAutoRoles.forEach(r => {
+				member.roles.add(r).catch(err => {});
+			});
+        }, 4000);
+
+        try { // Welcome image
+            const welcomeChannel = await member.guild.channels.cache.get(Plugins.resource.glexar.welcomeChannel);
+            if (!welcomeChannel) return;
+
+            // Canvas setup
+            const canvas = Plugins.cvCreate(1024, 500);
+            const ctx = Plugins.cvContext(canvas, '2d');
+            
+            // Background
+            await Plugins.cvImage(ctx,'./Media/welcome.jpg',0,0,canvas.width,canvas.height);
+    
+            // Welcome text
+            Plugins.cvText(ctx,'#ffffff','bold 75px helvetica',`WELCOME`, 300, 400);
+            Plugins.cvText(ctx,Plugins.resource.glexar.hex,'bold 50px helvetica',user.tag, 300, 450);
+    
+            // Circle trim
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 - 20, 200, 130, 0, Math.PI*2, false);
+            ctx.lineWidth = 15;
+            ctx.strokeStyle = Plugins.resource.glexar.hex;
+            ctx.stroke();
+            ctx.closePath();
+            ctx.clip();
+
+            // Avatar
+            await Plugins.cvImage(ctx,user.displayAvatarURL({extension: 'jpg'}),canvas.width / 2 - 150, 70, 260, 260);
+
+            // Send attachment
+            const attach = new Discord.AttachmentBuilder(canvas.toBuffer(), 'Welcome_To_Glexar.png');
+            if (!attach) return;
+            welcomeChannel.send({ files: [attach] }).catch(err => {});
+        } catch (err) {console.error(Error(err))};
+        
+        try { // Welcome DM Embed
+            const welcomeButtons = new Discord.ActionRowBuilder()
+            .addComponents(
+                new Discord.ButtonBuilder()
+                    .setStyle(Discord.ButtonStyle.Link)
+                    .setLabel('Chat')
+                    .setURL(`https://discord.gg/RPRKE4ycHE`),
+                new Discord.ButtonBuilder()
+                    .setStyle(Discord.ButtonStyle.Link)
+                    .setLabel('Roles')
+                    .setURL('https://discord.gg/sPxZFTDtg7'),
+                new Discord.ButtonBuilder()
+                    .setStyle(Discord.ButtonStyle.Link)
+                    .setLabel('Rules')
+                    .setURL('https://discord.gg/4Sdg27cjYD')
+            )
+        
+            let welcomeMessage = new Discord.EmbedBuilder()
+                .setTitle(`🔸Welcome ${user.username}🔸`)
+                .setDescription(`Hello **__${user.username}__** and welcome to **Glexar**, A place for gamers, competitors, creators, and friends!\n\nWe're excited to get to know you in chat.\n\nIf you have any questions or need help with anything you may dm the bot to create a ticket.\n**Your rewards have been sent.**`) //
+                .setThumbnail(Plugins.resource.glexar.logo)
+                .setImage(Plugins.resource.glexar.banner)
+                .setColor(Plugins.resource.glexar.hex)
+
+            user.send({ embeds: [welcomeMessage], components: [welcomeButtons]}).catch(err => {console.error(err)});
+        } catch (err) {console.error(Error(err))}
+
+        try {
+            let cheer = [
+                'WoOooOO!',
+                'YayYyy!',
+                '!##BoOoOOM!!#!',
+                'HoOoraYy',
+                'Can you believe it!',
+                'OoOooOOh yeahhhHh!!!!',
+                'Is that a new member I smell?!??',
+                'WOooOoOOW!!',
+                'WEEEEEEEEE',
+                'Would you look at that...',
+                'Guys!! no way!!!!',
+                'Violets are blue flowers are red',
+                'I like to see it.',
+                'YEEEESSSSSS!!^!',
+                'GGs',
+                'No way',
+                'NICEEE!!!',
+                'Ouch... My code tells me',
+                'Look who decided to show up...',
+                'Are you who I think you are...',
+                'You smell like flowers.',
+                '10-4,',
+                'I bet you use 4-3 linear no deadzone...',
+                'LETS PARTY!!!',
+                'Beeb Boooooob Beeeb',
+                'Ahh. I\'m running out of things to say,',
+                'Do you like watermelons... Anyways,',
+                'You SUS',
+                'FBI agent.',
+                'FBI agent (0_0)',
+                'Everyone RUN!!',
+                'He\s lonely...',
+                '911 we got em,',
+                'I smell new.. Oh it\'s just a new member.',
+                'Can we just give a round of applause.',
+                'A LEGEND has joined.',
+                'My hero!',
+                'It\'s a bird, it\'s a plane, it\'s...',
+                'Big brain time.',
+                'Do I know you from somewere.....',
+                'newMember++','Console.log("New Member!");',
+                'I\'m running out of things to say...',
+                'I have limits! I can\'t just keep making these awesome responses...',
+                'Oh hi!',
+                'Oh.. Ommm I don\'t know what to say anymore.',
+                'This guy is SUSY SUS!',
+                'Get a bottl\' of wata\'',
+                'Did Melon invite u?!',
+                'Are you\'re british?',
+                `Help me stop %#@$)@$*@`,
+                `You sound offly familiar.`,
+                `Uh ohh`,
+                `No comment...`,
+                `I love Melon- a- I mean`,
+                `HOT`,
+                `!!!FIRE!!!`,
+                `Marry me,`,
+                `My code tells me this guy arrived smhh...`,
+                `Ooooh, so now you decided to show up huh!`,
+                `Yeah, let's not talk about your avatar...`,
+                `Uh, that avatar...`,
+                `Looking good! just like KingMelon!`,
+                `You almost look as hot as KingMelon...`,
+                `Beautiful!`,
+                `Who ever invited you must be blind.`,
+                `Tell the guy that invited you to do better.`,
+                `My robot parts tell me`,
+                `AHH make way for the king!`,
+                `MAKE WAY FOR THE KING`,
+                `I'm 100% not married to KingMelon,`,
+                `Juist bcuse ime a robiut doest mean I cant makke mistkes,`,
+                `I know i'm a robot, but damn he's almost as hot as KingMelon!`,
+                `KingMelon is hotter than you... Grrrr,`,
+                `Yeah... I got nothing...`,
+                `I legit don't have anything else to say...`,
+                `Omg I need people to come up with new awesome responses to joins.`
+            ];
+            const mainChatChannel = await member.guild.channels.cache.get(Plugins.resource.glexar.mainChatChannel);
+            if (!mainChatChannel) return;
+
+            // Ping member in chat
+            if (mainChatChannel) {
+                mainChatChannel.send({ content: `**${cheer[Plugins.randomNum(0,cheer.length-1)]}** <@!${member.id}> joined the server!` }).catch(err => {});
+            };
+        } catch (err) {console.error(Error(err))}
+    });
+}

@@ -1,0 +1,18 @@
+const Discord = require('discord.js');
+const Plugins = require('../plugins');
+
+
+
+module.exports = async (bot) => {
+    bot.on('messageCreate', async (message) => {
+        if (message.author.bot) return;
+
+        
+        const category = 'textXP';
+        if (!Plugins.var.cooldowns[category]) Plugins.var.cooldowns[category] = {};
+        if (Plugins.var.cooldowns[category][message.author.id] > Date.now()) return;
+        Plugins.var.cooldowns[category][message.author.id] = Date.now() + (60 * 1000); // Set new cooldown
+
+        Plugins.db(`INCREMENT/user/${message.author.id}/stats/exp`,Plugins.randomNum(15,25));
+    });
+};

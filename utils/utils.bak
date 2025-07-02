@@ -1,0 +1,333 @@
+/*
+
+const Discord = require('discord.js');
+require('dotenv').config();
+
+///   RESOURCE   ///
+module.exports.resource = {
+	glexar: {
+		guild: '568143069116104704',
+		logo: 'https://firebasestorage.googleapis.com/v0/b/teamglexar.appspot.com/o/Glexar_Logo.jpg?alt=media&token=cbacb361-9a09-42e0-8adf-e47d93017773',
+		banner: 'https://firebasestorage.googleapis.com/v0/b/teamglexar.appspot.com/o/Glexar_Banner_3.jpg?alt=media&token=e4ebf3e8-2dd8-47f3-903c-d77744296c57',
+		hex: '#ff7e27',
+
+		autoRoles: [],
+		expFormula: 150,
+
+		welcomeChannel: '1086745703050662081',
+		mainChatChannel: '1086749622413840435',
+		commandChannel: '1086749544643035236',
+		modMailChannel: '1086750850778681374',
+	},
+
+	checkEmoji: '✅',
+	crossEmoji: '❌',
+	warnEmoji: '⚠️',
+	errorEmoji: '⁉️',
+
+
+	defaultBackground: '',
+};
+///   RESOURCE   ///
+
+
+
+///   FIREBASE   ///
+const admin = require('firebase-admin');
+
+// Databases
+const GlexarDB = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.GlexarDB)),
+}, 'GlexarDB');
+const PrimaryDB1 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.PrimaryDB1)),
+}, 'PrimaryDB1');
+const PrimaryDB2 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.PrimaryDB2)),
+}, 'PrimaryDB2');
+const PrimaryDB3 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.PrimaryDB3)),
+	projectId: 'primarydb3'
+}, 'PrimaryDB3');
+const PrimaryDB4 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.PrimaryDB4)),
+}, 'PrimaryDB4');
+const PrimaryDB5 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.PrimaryDB5)),
+}, 'PrimaryDB5');
+
+
+const SecondaryDB1 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.SecondaryDB1)),
+}, 'SecondaryDB1');
+const SecondaryDB2 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.SecondaryDB2)),
+}, 'SecondaryDB2');
+const SecondaryDB3 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.SecondaryDB3)),
+}, 'SecondaryDB3');
+const SecondaryDB4 = admin.initializeApp({
+	credential: admin.credential.cert(JSON.parse(process.env.SecondaryDB4)),
+}, 'SecondaryDB4');
+
+
+// Database References
+module.exports.dbTree = (location, type) => {
+	switch (location.toUpperCase()) {
+		case 'GLEXAR': // Direct to this db when gettings user data
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return GlexarDB.firestore();
+				case 'DATABASE':
+					return GlexarDB.database('https://teamglexar-default-rtdb.firebaseio.com');
+				default:
+					throw `plugins.GlexarDB: Invalid type (${type})`;
+			}
+		case 'USER':
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return PrimaryDB1.firestore();
+				case 'DATABASE':
+					return PrimaryDB1.database('https://primarydb1.firebaseio.com');
+				default:
+					throw `plugins.PrimaryDB1: Invalid type (${type})`;
+			}
+		case 'INVENTORY':
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return PrimaryDB2.firestore();
+				case 'DATABASE':
+					return PrimaryDB2.database('https://primarydb2.firebaseio.com');
+				default:
+					throw `plugins.PrimaryDB2: Invalid type (${type})`;
+			}
+		case 'SETTING':
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return PrimaryDB3.firestore();
+				case 'DATABASE':
+					return PrimaryDB3.database('https://primarydb3.firebaseio.com');
+				default:
+					throw `plugins.PrimaryDB3: Invalid type (${type})`;
+			}
+		case 'TRACKER':
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return PrimaryDB4.firestore();
+				case 'DATABASE':
+					return PrimaryDB4.database('https://primarydb4.firebaseio.com');
+				default:
+					throw `plugins.PrimaryDB4: Invalid type (${type})`;
+			}
+		case 'RANKED':
+			switch (type.toUpperCase()) {
+				case 'FIRESTORE':
+					return PrimaryDB5.firestore();
+				case 'DATABASE':
+					return PrimaryDB5.database('https://primarydb5.firebaseio.com');
+				default:
+					throw `plugins.PrimaryDB5: Invalid type (${type})`;
+			}
+	}
+	throw `plugins.dbTree: Invalid reference location (${location})`;
+};
+
+
+
+module.exports.db = async (location, data, options) => {
+	let path = location.split('/');
+	if (!path) return null;
+	let ref = location.substr((path[0]+path[1]).length+2,location.length);
+
+	switch (path[0].toUpperCase()) {
+		case 'SET':
+			if (!ref) return console.error(Error((`plugins.db: Must specify location of set data.`)));
+			this.dbTree(path[1],'DATABASE').ref(ref).set(data); //(data || null)
+			return data;
+		case 'INCREMENT':
+			if (isNaN(data)) return console.error(Error(`plugins.db: Attempted to increment with a none integer.`));
+
+			let currentNum = (await this.dbTree(path[1],'DATABASE').ref(ref).once('value')).val() || 0;
+
+			let calc = Number(currentNum)+Number(data);
+			if (calc === 0 || options?.positiveOnly && calc < 0) return this.dbTree(path[1],'DATABASE').ref(ref).remove();
+
+			this.dbTree(path[1],'DATABASE').ref(ref).set(calc);
+			return calc;
+		case 'GET':
+			if (ref) {
+				return (await this.dbTree(path[1],'DATABASE').ref(ref).once('value')).val();
+			} else {
+				return (await this.dbTree(path[1],'DATABASE').ref().once('value')).val();
+			};
+		case 'DELETE':
+			return this.dbTree(path[1],'DATABASE').ref(ref).remove();
+		case 'UPLOADURL':
+			const request = fetch(data).then((res) => {
+				const contentType = res.headers.get('content-type');
+				if (options) {
+					if (options.autoExtension) ref = ref+'.'+(contentType.split('/')[1]);
+				};
+				
+				const writeStream = this.dbTree(path[1],'STORAGE').file(ref).createWriteStream({
+					metadata: {
+						contentType,
+					}
+				});
+				
+				res.body.pipe(writeStream);
+			});
+			return request;
+		case 'DOWNLOADURL':
+			return this.dbTree(path[1],'STORAGE').file(ref).publicUrl();
+		case 'UNINSTALL':
+				return this.dbTree(path[1],'STORAGE').file(ref).delete().catch(err => {console.log(err)});
+		default:
+			return console.error(Error((`plugins.db: Invalid action (${path[0].toUpperCase()})`)));
+	}
+};
+///   FIREBASE   ///
+*/
+
+
+/*
+await client.connect();
+
+
+// Specify the database and collection
+const db = client.db('myDatabase'); // Replace with your database name
+const collection = db.collection('myCollection'); // Replace with your collection name
+
+// Insert a document
+const insertResult = await collection.insertOne({ name: 'Alice', age: 25 });
+console.log('Inserted document:', insertResult.insertedId);
+
+// Find a document
+const foundDocument = await collection.findOne({ name: 'Alice' });
+console.log('Found document:', foundDocument);
+*/
+
+
+
+/*
+///   WAIT   ///
+module.exports.wait = async (delay) => {
+	return Util.promisify(setTimeout)(delay*1000);
+};
+///   WAIT   ///
+
+
+
+
+///   hexToRGB   ///
+module.exports.hexToRGB = (hex) => {
+	var realHex = hex.substr(1,hex.length);
+
+	if(realHex.length != 6){
+		realHex = 'ffffff' // Default to a white color
+		console.error(Error('Only six-digit hex colors are allowed.'));
+	};
+	
+	var aRgbHex = realHex.match(/.{1,2}/g);
+	var aRgb = [
+		parseInt(aRgbHex[0], 16),
+		parseInt(aRgbHex[1], 16),
+		parseInt(aRgbHex[2], 16)
+	];
+	return aRgb;
+};
+///   hexToRGB   ///
+
+
+
+///   kFormatter   ///
+module.exports.kFormatter = (num) => {
+	if (num <= 0) return num;
+
+	if (Math.abs(num) > 999999) {
+		return Math.abs(num) > 999999 ? Math.sign(num)*((Math.abs(num)/1000000).toFixed(1)) + 'M' : Math.sign(num)*Math.abs(num)
+	} else if (Math.abs(num) > 999) {
+		return Math.abs(num) > 999 ? Math.sign(num)*((Math.abs(num)/1000).toFixed(1)) + 'K' : Math.sign(num)*Math.abs(num)
+	} else {
+		return '$'+num;
+	}
+};
+///   kFormatter   ///
+
+
+
+///   GetMainRole   ///
+module.exports.getMainRole = async (member) => {
+	let positions = [];
+	let roles = await member.roles.cache
+
+	roles.forEach(r => {
+		positions.push(r.rawPosition);
+	})
+	positions = positions.sort((r1,r2) => r2 - r1);
+
+	return roles.find(r => r.rawPosition == positions[1]);
+};
+///   GetMainRole   ///
+
+
+
+
+
+///   Canvas   ///
+
+const cv = require('canvas');
+module.exports.cvCreate = (width, height) => {
+	return cv.createCanvas(width, height);
+};
+module.exports.cvContext = (canvas, context) => {
+	return canvas.getContext(context);
+};
+module.exports.cvText = (ctx,color,font,text,x,y,rotation) => {
+	ctx.fillStyle = color;
+	ctx.font = font;
+	ctx.rotate(rotation);
+	ctx.fillText(text, x, y);
+	ctx.rotate(-rotation);
+};
+module.exports.cvRect = (ctx,color,x,y,w,h,rotation) => {
+	ctx.fillStyle = color;
+	ctx.rotate(rotation);
+	ctx.fillRect(x,y,w,h);
+	ctx.rotate(-rotation);
+};
+module.exports.cvImage = async (ctx,image,x,y,w,h,rotation) => {
+	const loadedImage = await cv.loadImage(image);
+	ctx.rotate(rotation);
+	ctx.drawImage(loadedImage, x, y, w, h);
+	ctx.rotate(-rotation);
+};
+
+///   Canvas   ///
+
+
+
+///   Command Plugins   ///
+
+module.exports.updateApexRegistrationMessage = async (registrationID, bot) => {
+	try {
+		const guild = await bot.guilds.fetch(process.env.ENVIRONMENT === 'production' ? this.resource.Glexar.Guild : this.resource.testServer); 
+		if (!guild) return;
+	
+		const channel = await guild.channels.fetch(process.env.ENVIRONMENT === 'production' ? this.resource.apexRegistrationChannel : this.resource.testChannel);
+		if (!channel) return;
+	
+		const registrationMessage = await channel.messages.fetch(registrationID);
+		if (!registrationMessage) return;
+	
+		const {title, startDate, readyBefore, pCode, eventType, eventStatus, registeredTeams} = await this.db(`GET/glexar/apexRegistrations/${registrationID}`);
+	
+		const registrationCommand = require('./Commands/Apex/Apex.js');
+		const newRegistrationEmbed = await registrationCommand.embed(title, startDate, readyBefore, eventType, eventStatus, registeredTeams);
+	
+		return registrationMessage.edit({ embeds: [newRegistrationEmbed]}).catch(err => {});
+	} catch (error) {console.error(Error('updateApexRegistrationMessage '+error))}
+}
+
+///   Command Plugins   ///
+*/
