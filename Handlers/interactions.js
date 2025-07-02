@@ -4,7 +4,7 @@ const path = require('path');
 
 module.exports = async (bot) => {
     // Interaction Loader
-    
+
     const interactionDirs = {
         modal: path.join(__dirname, '../Interactions/ModalSubmit'),
         selectMenu: path.join(__dirname, '../Interactions/SelectMenu')
@@ -47,11 +47,31 @@ module.exports = async (bot) => {
             await modalInteraction(interaction);
         } else if (interaction.isStringSelectMenu()) {
             const interactionName = interaction.customId.split('_')[0].toUpperCase();
-            
+
             const selectMenuInteraction = bot.interactionHandlers.selectMenu.get(interactionName);
             if (!selectMenuInteraction) return
 
             await selectMenuInteraction(interaction);
+        }
+          else if (interaction.isChatInputCommand()) {
+            const interactionName = interaction.customId.split('_')[0].toUpperCase();
+
+            const command = bot.commands.get(interaction.commandName);
+
+            if (command) {
+              return command.execute(interaction);
+            } else {
+              const CustomCommand = require('../models/CustomCommand');
+              const cmd = await CustomCommand.findOne({
+                guildId: interaction.guildId,
+                name: interaction.commandName
+              });
+
+              if (cmd) {
+                return interaction.reply(cmd.response);
+              }
+            }
+          }
         }
     });
 };
