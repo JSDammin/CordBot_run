@@ -61,7 +61,7 @@ module.exports = async (bot) => {
             if (command) {
               return command.execute(interaction);
             } else {
-              const CustomCommand = require('../models/CustomCommand');
+              const CustomCommand = require('../models/CustomCommand.js');
               const cmd = await CustomCommand.findOne({
                 guildId: interaction.guildId,
                 name: interaction.commandName
