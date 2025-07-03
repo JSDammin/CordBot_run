@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const CustomCommand = require('../Modals/CustomCommand');
+const CustomCommand = require('../models/CustomCommand');
 
 module.exports = {
   data: new SlashCommandBuilder()
