@@ -72,5 +72,23 @@ module.exports = async (bot) => {
               }
             }
           }
+          if (interaction.isChatInputCommand()) {
+            const command = bot.commands.get(interaction.commandName);
+
+            if (command) {
+              return command.execute(interaction);
+            } else {
+              const CustomCommand = require('../models/CustomCommand');
+              const cmd = await CustomCommand.findOne({
+                guildId: interaction.guildId,
+                name: interaction.commandName
+              });
+
+              if (cmd) {
+                return interaction.reply(cmd.response);
+              }
+            }
+          }
+
     });
 };
